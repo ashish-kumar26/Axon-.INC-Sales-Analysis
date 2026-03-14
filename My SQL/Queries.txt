@@ -1,0 +1,254 @@
+/* ============================================================
+   DATABASE CONFIGURATION
+   Purpose:
+     Sets database date format to handle CRM exported
+     date values correctly (DD-MM-YYYY format).
+   ============================================================ */
+
+ALTER DATABASE "Axon Project"
+SET datestyle TO 'ISO, DMY';
+
+
+
+/* ============================================================
+   TABLE: users
+   Purpose:
+     Stores system user information including ownership,
+     department, and organizational hierarchy details.
+   Grain:
+     One row per user.
+   ============================================================ */
+
+DROP TABLE IF EXISTS users;
+
+CREATE TABLE users (
+    active TEXT,
+    unknown TEXT,
+    country VARCHAR(100),
+    created_by_id VARCHAR(50),
+    created_date TEXT,
+    department VARCHAR(100),
+    full_name VARCHAR(150),
+    last_login TEXT,
+    last_modified_by_id VARCHAR(50),
+    last_modified_date TEXT,
+    manager_id VARCHAR(50),
+    nickname VARCHAR(100),
+    profile_id VARCHAR(50),
+    role_id VARCHAR(50),
+    state_province VARCHAR(100),
+    user_id VARCHAR(50) PRIMARY KEY,
+    user_type VARCHAR(50)
+);
+
+
+
+/* ============================================================
+   TABLE: account
+   Purpose:
+     Stores customer account master data including
+     billing, shipping, and ownership details.
+   Grain:
+     One row per account.
+   ============================================================ */
+
+DROP TABLE IF EXISTS account;
+
+CREATE TABLE account (
+    account_id VARCHAR(50) PRIMARY KEY,
+    account_name VARCHAR(200),
+    account_rating VARCHAR(50),
+    account_type VARCHAR(100),
+    application VARCHAR(150),
+    billing_city VARCHAR(100),
+    billing_country VARCHAR(100),
+    billing_state_province VARCHAR(100),
+    created_by_id VARCHAR(50),
+    created_date TIMESTAMP,
+    industry VARCHAR(100),
+    last_activity TEXT,
+    last_modified_by_id VARCHAR(50),
+    last_modified_date TEXT,
+    lead_type VARCHAR(100),
+    owner_id VARCHAR(50),
+    parent_account_id VARCHAR(50),
+    record_type_id VARCHAR(50),
+    shipping_city VARCHAR(100),
+    shipping_country VARCHAR(100),
+    shipping_state_province VARCHAR(100),
+    shipping_zip_postal_code VARCHAR(20),
+    system_modstamp TEXT,
+
+    CONSTRAINT fk_account_owner
+        FOREIGN KEY (owner_id)
+        REFERENCES users(user_id)
+);
+
+
+
+/* ============================================================
+   TABLE: opportunity
+   Purpose:
+     Stores sales opportunity pipeline data used for
+     revenue tracking, forecasting, and conversion analysis.
+   Grain:
+     One row per opportunity record.
+   ============================================================ */
+
+DROP TABLE IF EXISTS opportunity;
+
+CREATE TABLE opportunity (
+    opportunity_id VARCHAR(50),
+    account_id VARCHAR(50),
+    campaign_id VARCHAR(50),
+    close_date TEXT,
+    closed_lost_reason TEXT,
+    contact_id VARCHAR(50),
+    created_by_id VARCHAR(50),
+    created_date TEXT,
+    fiscal_quarter VARCHAR(20),
+    fiscal_year TEXT,
+    forecast_category VARCHAR(50),
+    industry VARCHAR(100),
+    interface_type VARCHAR(100),
+    last_activity TEXT,
+    last_stage_change_date TEXT,
+    ldo VARCHAR(100),
+    lead_application VARCHAR(150),
+    lead_source VARCHAR(100),
+    owner_id VARCHAR(50),
+    primary_application VARCHAR(150),
+    primary_contact VARCHAR(100),
+    product_category VARCHAR(100),
+    product_of_interest VARCHAR(150),
+    stage VARCHAR(100),
+    amount TEXT,
+    probability TEXT
+);
+
+
+
+/* ============================================================
+   TABLE: opportunity_product
+   Purpose:
+     Stores product-level details linked to opportunities,
+     enabling product performance and revenue contribution analysis.
+   Grain:
+     One row per opportunity line item.
+   ============================================================ */
+
+DROP TABLE IF EXISTS opportunity_product;
+
+CREATE TABLE opportunity_product (
+    line_item_id VARCHAR(50),
+    opportunity_id VARCHAR(50),
+    created_by_id VARCHAR(50),
+    created_date TEXT,
+    last_modified_by_id VARCHAR(50),
+    last_modified_date TEXT,
+    product_name VARCHAR(200),
+    price_book_entry_id VARCHAR(50),
+    product_code VARCHAR(50),
+    product_id VARCHAR(50),
+    discount TEXT,
+    list_price TEXT,
+    quantity TEXT,
+    sales_price TEXT,
+    subtotal TEXT,
+    total_price TEXT
+);
+
+
+
+/* ============================================================
+   TABLE: lead
+   Purpose:
+     Stores marketing and sales lead information used
+     for lead generation and conversion analysis.
+   Grain:
+     One row per lead.
+   ============================================================ */
+
+DROP TABLE IF EXISTS lead;
+
+CREATE TABLE lead (
+    city VARCHAR(100),
+    converted TEXT,
+    country VARCHAR(100),
+    created_date TEXT,
+    dead_reason TEXT,
+    email_opt_out TEXT,
+    industry VARCHAR(100),
+    key_account TEXT,
+    last_status_change TEXT,
+    lead_id VARCHAR(50),
+    lead_source VARCHAR(100),
+    lead_status_at_conversion VARCHAR(100),
+    leadrecordtype VARCHAR(100),
+    ls_team_notified TEXT,
+    next_step_leads TEXT,
+    pardot_conversion_date TEXT,
+    pardot_created_date TEXT,
+    pardot_first_activity TEXT,
+    pardot_last_activity TEXT,
+    primary_research_application VARCHAR(150),
+    product_category VARCHAR(100),
+    record_type_id VARCHAR(50),
+    ss_team_notified TEXT,
+    state_province VARCHAR(100),
+    status VARCHAR(100),
+    campaign_membership_count TEXT,
+    pardot_score TEXT
+);
+
+
+
+/* ============================================================
+   LEAD DASHBOARD KPI QUERIES
+   Purpose:
+     Measures lead generation performance and conversion metrics.
+   ============================================================ */
+
+-- Total Leads
+SELECT COUNT(*) AS total_leads FROM lead;
+
+-- Expected Amount from Converted Leads
+SELECT 
+SUM(REPLACE(REPLACE(REPLACE(amount,'$',''),',',''),' ','')::NUMERIC) 
+AS expected_amount
+FROM opportunity
+WHERE stage = 'Closed Won';
+
+-- Lead Conversion Rate
+SELECT 
+ROUND(
+COUNT(CASE WHEN converted = 'TRUE' THEN 1 END) * 100.0
+/ COUNT(*),2
+) AS conversion_rate
+FROM lead;
+
+-- Converted Accounts
+SELECT COUNT(DISTINCT account_id)
+FROM opportunity
+WHERE stage = 'Closed Won';
+
+-- Converted Opportunities
+SELECT COUNT(*)
+FROM opportunity
+WHERE stage = 'Closed Won';
+
+-- Lead by Source
+SELECT lead_source, COUNT(*) AS total_leads
+FROM lead
+GROUP BY lead_source
+ORDER BY total_leads DESC;
+
+-- Lead by Industry
+SELECT industry, COUNT(*) AS total_leads
+FROM lead
+GROUP BY industry
+ORDER BY total_leads DESC;
+
+-- Lead by Stage
+SELECT status, COUNT(*) AS total
+FROM lead
